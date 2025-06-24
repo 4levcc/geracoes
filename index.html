@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Chosen Palette: Sophisticated & Serene -->
+    <!-- Application Structure Plan: A single-page application with a top-down narrative flow. It starts with a dynamic headline. The core interaction is a sticky top navigation bar acting as a visual timeline, allowing users to select a generation. Selecting a generation dynamically updates a central content hub with detailed information (profile, characteristics via a radar chart, formative events, and textual analysis). This structure was chosen over a linear report format to promote user-driven exploration and easy comparison between generational cohorts. The page concludes with a non-interactive section on macro-level dynamics (coexistence, accelerating change) to provide broader context. -->
+    <!-- Visualization & Content Choices: 
+        - Timeline Navigation (HTML/CSS/JS): Goal: Organize/Navigate. Method: Sticky buttons. Justification: Provides constant, intuitive access to the main interactive feature.
+        - Radar Chart (Chart.js/Canvas): Goal: Compare. Method: Displays multiple quantified traits (e.g., tech affinity, pragmatism) for the selected generation. Justification: Offers a quick, powerful visual summary of a generation's profile, making complex characteristics easily comparable.
+        - Formative Events List (Styled HTML): Goal: Inform. Method: A concise list of key events. Justification: Directly links historical context to generational identity as emphasized in the report.
+        - Donut Chart (Chart.js/Canvas): Goal: Compare/Inform. Method: Shows illustrative composition of the multigenerational workforce. Justification: Visualizes the coexistence dynamic described in section 2.2 of the report.
+        - Line Chart (Chart.js/Canvas): Goal: Change. Method: Shows the shortening duration of generational cycles. Justification: Illustrates the key concept of accelerating change discussed in the report.
+        - Styled Cards (HTML/CSS): Goal: Organize/Inform. Method: Explain core sociological concepts. Justification: Breaks down complex theories like "Contato Fresco" into digestible pieces.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <title>Análise Interativa das Gerações</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        #nav-geracoes {
+            transition: all 0.3s ease-in-out;
+        }
+        .nav-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .nav-button.active {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <header class="text-center py-12 px-4 bg-white shadow-sm">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-[#2a3d45] mb-2">O Mosaico das Gerações</h1>
+        <p class="text-lg text-gray-600 max-w-3xl mx-auto">Uma exploração interativa das coortes que definem o nosso tempo, moldadas pela história e pela tecnologia.</p>
+    </header>
+
+    <nav id="nav-geracoes" class="sticky top-0 z-10 bg-white/80 backdrop-blur-sm shadow-md py-4">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-wrap justify-center gap-2 md:gap-3">
+                <button class="nav-button text-xs md:text-sm font-semibold px-3 py-2 rounded-full shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300" data-gen="silent">G. Silenciosa</button>
+                <button class="nav-button text-xs md:text-sm font-semibold px-3 py-2 rounded-full shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300" data-gen="boomers">Baby Boomers</button>
+                <button class="nav-button text-xs md:text-sm font-semibold px-3 py-2 rounded-full shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300" data-gen="genx">Geração X</button>
+                <button class="nav-button text-xs md:text-sm font-semibold px-3 py-2 rounded-full shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300 active" data-gen="millennials">Millennials</button>
+                <button class="nav-button text-xs md:text-sm font-semibold px-3 py-2 rounded-full shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300" data-gen="genz">Geração Z</button>
+                <button class="nav-button text-xs md:text-sm font-semibold px-3 py-2 rounded-full shadow-sm bg-gray-200 text-gray-700 hover:bg-gray-300" data-gen="alpha">Geração Alpha</button>
+            </div>
+        </div>
+    </nav>
+    
+    <main class="container mx-auto p-4 md:p-8">
+        <section id="generation-display" class="bg-white rounded-xl shadow-lg p-6 md:p-8 mb-12">
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
+                <div class="lg:col-span-3">
+                    <h2 id="gen-title" class="text-3xl font-extrabold mb-1 text-[#2a3d45]"></h2>
+                    <p id="gen-years" class="text-md font-semibold text-[#c17c74] mb-4"></p>
+                    <p id="gen-summary" class="text-gray-600 mb-6"></p>
+                    
+                    <h4 class="font-bold text-lg text-[#2a3d45] mb-3">Eventos Formativos Chave</h4>
+                    <ul id="gen-events" class="list-none space-y-2">
+                    </ul>
+                </div>
+                <div class="lg:col-span-2">
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8 pt-6 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h4 class="font-bold text-lg text-[#2a3d45] mb-2">Crenças e Valores</h4>
+                    <p id="gen-beliefs" class="text-gray-600 text-sm"></p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg text-[#2a3d45] mb-2">No Ambiente de Trabalho</h4>
+                    <p id="gen-workplace" class="text-gray-600 text-sm"></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="dynamics" class="mb-12">
+            <h2 class="text-3xl font-bold text-center text-[#2a3d45] mb-10">Dinâmicas Intergeracionais</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="font-bold text-xl text-center text-[#2a3d45] mb-4">Coexistência no Trabalho</h3>
+                    <p class="text-center text-sm text-gray-500 mb-4">Atualmente, até 5 gerações partilham o ambiente de trabalho. A distribuição ilustrativa abaixo mostra a proeminência dos Millennials e da Geração X.</p>
+                    <div class="chart-container h-64">
+                        <canvas id="workforceChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="font-bold text-xl text-center text-[#2a3d45] mb-4">Ciclos Geracionais</h3>
+                    <p class="text-center text-sm text-gray-500 mb-4">A aceleração tecnológica está a encurtar a duração dos ciclos geracionais, criando lacunas de experiência mais profundas entre coortes.</p>
+                    <div class="chart-container h-64">
+                        <canvas id="cycleChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-6 space-y-4">
+                    <h3 class="font-bold text-xl text-center text-[#2a3d45]">Conceitos Sociológicos</h3>
+                    <div>
+                        <h4 class="font-semibold text-gray-700">Contato Fresco</h4>
+                        <p class="text-sm text-gray-600">Teoria de Karl Mannheim que descreve como as gerações jovens reinterpretam o mundo, desafiando normas e impulsionando a mudança social.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-700">Ambivalência Intergeracional</h4>
+                        <p class="text-sm text-gray-600">A coexistência de sentimentos positivos (apoio, afeto) e negativos (tensão, frustração) nas relações entre gerações.</p>
+                    </div>
+                     <div>
+                        <h4 class="font-semibold text-gray-700">Microgerações</h4>
+                        <p class="text-sm text-gray-600">Pequenas coortes (ex: Xennials, Zillennials) nascidas nas cúspides de gerações maiores, partilhando traços de ambas.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="text-center py-8 px-4 border-t border-gray-200">
+        <p class="text-gray-600">Este aplicativo interativo baseia-se na análise do relatório "As Gerações no Século XXI".</p>
+        <p class="text-xs text-gray-400 mt-2">Desenvolvido como uma ferramenta de visualização de dados.</p>
+    </footer>
+
+    <script>
+        const generationData = {
+            silent: {
+                title: 'Geração Silenciosa',
+                years: '1928 - 1945',
+                summary: 'Moldada pela Grande Depressão e pela Segunda Guerra Mundial, esta geração é conhecida pela sua resiliência, disciplina e forte sentido de dever. Valorizam a estabilidade e a segurança acima de tudo.',
+                events: [
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Grande Depressão</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Segunda Guerra Mundial</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Início da Guerra Fria e Era McCarthy</li>'
+                ],
+                beliefs: 'As suas crenças centram-se na frugalidade, no trabalho árduo e na lealdade às instituições. Tendem a ser tradicionalistas e conformistas, valorizando a família e a comunidade.',
+                workplace: 'No trabalho, são membros de equipa fiáveis e dedicados, com uma forte ética de trabalho. Preferem métodos de comunicação tradicionais e valorizam o respeito interpessoal.',
+                radar: [2, 4, 2, 4, 5, 2]
+            },
+            boomers: {
+                title: 'Baby Boomers',
+                years: '1946 - 1964',
+                summary: 'Nascidos no otimismo e na prosperidade do pós-guerra, os Baby Boomers são uma força cultural e política. Caracterizam-se pelo idealismo, individualismo e um desejo de crescimento pessoal.',
+                events: [
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Movimento pelos Direitos Civis</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Guerra do Vietname e Contracultura</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Ascensão da Televisão e do Rock and Roll</li>'
+                ],
+                beliefs: 'Defendem ideais de justiça social e questionam a autoridade. Embora inicialmente desengajados de instituições tradicionais, muitos tornaram-se mais conservadores com o tempo. Valorizam o sucesso e a realização.',
+                workplace: 'Orientados para o trabalho em equipa e competitivos, os Boomers foram instrumentais na construção de carreiras corporativas. Muitos estão agora em posições de liderança, oferecendo mentoria.',
+                radar: [2, 3, 4, 3, 4, 4]
+            },
+            genx: {
+                title: 'Geração X',
+                years: '1965 - 1980',
+                summary: 'Conhecida como a "geração da chave na porta", a Geração X cresceu com mais independência e ceticismo. São pragmáticos, adaptáveis e valorizam o equilíbrio entre a vida pessoal e profissional.',
+                events: [
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Queda do Muro de Berlim</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Crise da SIDA (AIDS)</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Boom do computador pessoal (PC)</li>'
+                ],
+                beliefs: 'Céticos em relação às instituições, valorizam a autenticidade e a autossuficiência. Priorizam relações próximas e a segurança financeira, tendo enfrentado instabilidade económica na juventude.',
+                workplace: 'Adaptáveis e tecnologicamente experientes, são a ponte entre o mundo analógico e o digital. Valorizam a autonomia e a flexibilidade, e são conhecidos pela sua forte ética de trabalho independente.',
+                radar: [3, 5, 2, 5, 2, 3]
+            },
+            millennials: {
+                title: 'Millennials (Geração Y)',
+                years: '1981 - 1996',
+                summary: 'A primeira geração a atingir a maioridade no novo milénio, os Millennials são nativos digitais moldados pela ascensão da internet. São socialmente conscientes, colaborativos e orientados por um propósito.',
+                events: [
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Expansão da Internet e 11 de Setembro</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Crise Financeira Global de 2008</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Ascensão das redes sociais</li>'
+                ],
+                beliefs: 'Priorizam experiências em detrimento de bens materiais e procuram significado e propósito no seu trabalho e na sua vida. Valorizam a diversidade, a inclusão e a transparência.',
+                workplace: 'Procuram flexibilidade, desenvolvimento contínuo e um ambiente de trabalho colaborativo. São mais propensos a mudar de emprego para se alinharem com os seus valores pessoais e profissionais.',
+                radar: [4, 4, 5, 3, 3, 5]
+            },
+            genz: {
+                title: 'Geração Z',
+                years: '1997 - 2012',
+                summary: 'Verdadeiros nativos digitais, a Geração Z cresceu com conectividade constante. São pragmáticos, empreendedores e profundamente empenhados em questões de justiça social e ambiental.',
+                events: [
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Smartphones e Redes Sociais Ubíquas</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Pandemia de COVID-19</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Ativismo digital (ex: #BlackLivesMatter, Clima)</li>'
+                ],
+                beliefs: 'Valorizam a autenticidade, a diversidade e a fluidez identitária. São pragmáticos quanto ao seu futuro financeiro e demonstram um forte sentido de ética e responsabilidade social nas suas decisões de consumo.',
+                workplace: 'São multitarefa, independentes e esperam flexibilidade. Preferem comunicação visual e digital e valorizam empregadores que demonstrem um forte compromisso com a ética e a inclusão.',
+                radar: [5, 4, 5, 4, 1, 4]
+            },
+            alpha: {
+                title: 'Geração Alpha',
+                years: '2010 - 2024',
+                summary: 'A geração mais recente, os Alphas, está a ser moldada por um mundo de IA, ecrãs onipresentes e uma consciência global e ambiental sem precedentes. São vistos como adaptáveis e tecnologicamente fluentes.',
+                events: [
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Onipresença da Inteligência Artificial (IA)</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Pandemia de COVID-19 (na infância)</li>',
+                    '<li><span class="font-semibold text-[#8c5046]">●</span> Crises climáticas evidentes</li>'
+                ],
+                beliefs: 'Com uma forte consciência ambiental e social instilada desde cedo, valorizam a sustentabilidade e a igualdade. As suas opiniões são influentes nas decisões de compra da família.',
+                workplace: 'Ainda a formar-se, projeta-se que serão altamente empreendedores, independentes e preparados para carreiras que ainda não existem, exigindo aprendizagem e adaptação contínuas.',
+                radar: [5, 5, 4, 2, 2, 3]
+            }
+        };
+
+        let radarChart;
+        
+        const wrapLabel = (str, maxWidth = 16) => {
+            if (str.length <= maxWidth) {
+                return str;
+            }
+            const words = str.split(' ');
+            let lines = [];
+            let currentLine = '';
+            words.forEach(word => {
+                if ((currentLine + ' ' + word).trim().length > maxWidth) {
+                    lines.push(currentLine.trim());
+                    currentLine = '';
+                }
+                currentLine += word + ' ';
+            });
+            lines.push(currentLine.trim());
+            return lines;
+        };
+        
+        const tooltipTitleCallback = (tooltipItems) => {
+            const item = tooltipItems[0];
+            let label = item.chart.data.labels[item.dataIndex];
+            if (Array.isArray(label)) {
+                return label.join(' ');
+            }
+            return label;
+        };
+
+        function updateUI(genId) {
+            const data = generationData[genId];
+            if (!data) return;
+
+            document.getElementById('gen-title').textContent = data.title;
+            document.getElementById('gen-years').textContent = data.years;
+            document.getElementById('gen-summary').textContent = data.summary;
+            document.getElementById('gen-events').innerHTML = data.events.join('');
+            document.getElementById('gen-beliefs').textContent = data.beliefs;
+            document.getElementById('gen-workplace').textContent = data.workplace;
+            
+            radarChart.data.datasets[0].data = data.radar;
+            radarChart.data.datasets[0].label = data.title;
+            radarChart.update();
+            
+            document.querySelectorAll('.nav-button').forEach(btn => {
+                btn.classList.remove('active', 'bg-[#70a0af]', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+                if (btn.dataset.gen === genId) {
+                    btn.classList.add('active', 'bg-[#70a0af]', 'text-white');
+                    btn.classList.remove('bg-gray-200', 'text-gray-700');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const radarCtx = document.getElementById('radarChart').getContext('2d');
+            radarChart = new Chart(radarCtx, {
+                type: 'radar',
+                data: {
+                    labels: [
+                        'Afinidade com Tecnologia', 
+                        'Independência/Autonomia', 
+                        'Ativismo Social', 
+                        'Pragmatismo/Ceticismo', 
+                        'Lealdade/Tradicionalismo', 
+                        'Colaboração/Coletivismo'
+                    ].map(l => wrapLabel(l)),
+                    datasets: [{
+                        data: [],
+                        backgroundColor: 'rgba(112, 160, 175, 0.2)',
+                        borderColor: 'rgba(112, 160, 175, 1)',
+                        pointBackgroundColor: 'rgba(112, 160, 175, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(112, 160, 175, 1)',
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
+                            grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                            pointLabels: { 
+                                font: { size: 10, weight: '600' },
+                                color: '#333'
+                            },
+                            ticks: {
+                                beginAtZero: true,
+                                max: 5,
+                                min: 0,
+                                stepSize: 1,
+                                backdropColor: 'transparent',
+                                color: '#666'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { title: tooltipTitleCallback } }
+                    }
+                }
+            });
+
+            const workforceCtx = document.getElementById('workforceChart').getContext('2d');
+            new Chart(workforceCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Millennials', 'Geração X', 'Baby Boomers', 'Geração Z'],
+                    datasets: [{
+                        data: [38, 32, 23, 7],
+                        backgroundColor: ['#70a0af', '#8c5046', '#c17c74', '#567d84'],
+                        borderColor: '#f8f9fa',
+                        borderWidth: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } },
+                        tooltip: { callbacks: { title: tooltipTitleCallback } }
+                    },
+                    cutout: '60%'
+                }
+            });
+
+            const cycleCtx = document.getElementById('cycleChart').getContext('2d');
+            new Chart(cycleCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Silenciosa', 'Boomers', 'Gen X', 'Millennials', 'Gen Z', 'Alpha'],
+                    datasets: [{
+                        label: 'Duração (anos)',
+                        data: [18, 19, 16, 16, 16, 15],
+                        fill: true,
+                        borderColor: '#8c5046',
+                        backgroundColor: 'rgba(140, 80, 70, 0.1)',
+                        tension: 0.3,
+                        pointBackgroundColor: '#8c5046',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            beginAtZero: false, 
+                            title: { display: true, text: 'Duração Estimada do Ciclo' } 
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { title: tooltipTitleCallback } }
+                    }
+                }
+            });
+
+            document.querySelectorAll('.nav-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    updateUI(e.target.dataset.gen);
+                });
+            });
+
+            updateUI('millennials');
+        });
+    </script>
+</body>
+</html>
